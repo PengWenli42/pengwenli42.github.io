@@ -1,0 +1,84 @@
+media:
+  input: public/uploads
+  output: /uploads
+  rename: safe
+  extensions: [jpg, jpeg, png, webp, gif, pdf]
+content:
+  - name: profile
+    label: 个人介绍与主页
+    type: file
+    path: content/profile.json
+    format: json
+    fields:
+      - { name: name, label: 姓名, type: string, required: true }
+      - { name: englishName, label: 英文名, type: string }
+      - { name: tagline, label: 一句话介绍, type: string }
+      - { name: intro, label: 首页简介, type: text }
+      - { name: about, label: 详细介绍, type: rich-text }
+      - { name: avatar, label: 头像, type: image }
+      - { name: location, label: 所在城市或机构, type: string }
+      - { name: email, label: 公开联系邮箱（可留空）, type: string }
+      - { name: github, label: GitHub 主页链接, type: string }
+      - { name: scholar, label: 学术主页链接, type: string }
+      - name: interests
+        label: 研究方向与兴趣
+        type: string
+        list: true
+      - name: experience
+        label: 教育与工作经历
+        type: object
+        list: true
+        fields:
+          - { name: period, label: 时间, type: string }
+          - { name: title, label: 职位或学位, type: string }
+          - { name: organization, label: 机构, type: string }
+  - name: posts
+    label: 博客与随笔
+    type: collection
+    path: content/posts
+    format: yaml-frontmatter
+    filename: '{year}-{month}-{day}-{hour}{minute}{second}-{primary}.md'
+    exclude: ['.gitkeep']
+    subfolders: false
+    view:
+      primary: title
+      fields: [title, date, category, published]
+      sort: date
+      order: desc
+    fields:
+      - { name: title, label: 文章标题, type: string, required: true }
+      - { name: date, label: 日期, type: date, required: true }
+      - { name: category, label: 分类（如随笔、阅读、研究）, type: string, default: 随笔 }
+      - { name: summary, label: 摘要, type: text }
+      - { name: cover, label: 封面图（可留空）, type: image }
+      - name: published
+        label: 在网站发布
+        type: boolean
+        default: false
+        description: 关闭时不显示在网站，但公开仓库里的原稿仍可被查看。请勿保存私人内容。
+      - { name: body, label: 正文, type: rich-text, required: true }
+  - name: publications
+    label: 成果与引用
+    type: collection
+    path: content/publications
+    format: json
+    filename: '{year}-{month}-{day}-{hour}{minute}{second}-{primary}.json'
+    exclude: ['.gitkeep']
+    subfolders: false
+    view:
+      primary: title
+      fields: [title, year, venue]
+      sort: year
+      order: desc
+    fields:
+      - { name: title, label: 成果标题, type: string, required: true }
+      - { name: authors, label: 作者, type: string, required: true }
+      - { name: year, label: 年份, type: number, required: true }
+      - { name: venue, label: 期刊、会议或作品类型, type: string }
+      - { name: description, label: 简介, type: text }
+      - { name: url, label: 成果链接（完整 https 链接）, type: string }
+      - { name: doi, label: DOI（例如 10.xxxx/xxxxx）, type: string }
+      - { name: pdf, label: PDF 附件, type: file }
+      - { name: citation, label: 引用文本（留空则根据作者、标题、年份生成）, type: text }
+      - { name: bibtex, label: BibTeX（可留空）, type: text }
+      - { name: published, label: 在网站显示, type: boolean, default: true }
