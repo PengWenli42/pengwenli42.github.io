@@ -5,3 +5,68 @@
 @media(max-width:900px){.shell{padding:0 32px}.hero{gap:35px;grid-template-columns:1fr 235px}.hero h1{font-size:57px}.home-sections{gap:32px}.header nav{gap:22px}.about-layout{gap:40px;grid-template-columns:1fr 220px}}
 @media(max-width:640px){.shell{padding:0 23px}.header{height:auto;min-height:122px;flex-direction:column;align-items:flex-start;justify-content:center;gap:12px;padding:20px 0 11px}.brand{font-size:15px}.brand-mark{width:35px;height:35px;font-size:20px}.brand small{font-size:9px}.header nav{width:100%;justify-content:space-between;gap:12px;font-size:12px}.header nav a{padding:5px 0 11px}.hero{grid-template-columns:1fr;gap:35px;padding:41px 0 42px}.hero h1{font-size:54px;margin:23px 0}.hero h1>span{font-size:22px}.intro{font-size:14px}.hero-links{margin-top:25px}.profile-note{transform:none;display:grid;grid-template-columns:80px 1fr;padding:18px;gap:0 19px;text-align:left;align-items:center}.profile-note:before{left:20px;width:40px;height:17px;top:-7px}.monogram{font-size:33px;height:74px;grid-row:1/3}.monogram span{padding-top:25px}.note-rule{display:none}.profile-note p{margin:0;align-self:end}.social-links{justify-content:flex-start;align-self:start;margin-top:6px;gap:12px}.avatar{width:74px;height:74px;grid-row:1/3}.home-sections{grid-template-columns:1fr;gap:38px;padding:29px 0 45px}.section-heading{margin-bottom:19px}.section-heading h2{font-size:23px}.empty{min-height:127px;padding:23px 19px}.page-heading{padding:40px 0 27px}.page-heading h1{font-size:35px}.about-layout{grid-template-columns:1fr;gap:35px;padding-bottom:45px}.about-aside{padding:20px 0 0;border-left:0;border-top:1px solid var(--line)}.blog-grid{grid-template-columns:1fr;gap:9px;padding-bottom:45px}.pub-list{padding-bottom:45px}.publication{grid-template-columns:21px 1fr;gap:11px}.publication h3{font-size:20px}.article{padding-top:29px}.article h1{font-size:29px}.article-heading{padding-top:24px}.prose{font-size:15px}.prose h2{font-size:24px}.prose blockquote{padding:12px 15px}footer{font-size:10px;padding:21px 0;align-items:flex-start}.footer-dot{margin:0 2px}footer a{font-size:10px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important}}
+
+/* Match both home columns to the same content rows. */
+.home-sections{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto auto;column-gap:60px;row-gap:0}
+.home-section{min-width:0;display:grid;grid-row:span 4;grid-template-rows:subgrid}
+.home-list{min-width:0;display:grid;grid-row:span 2;grid-template-rows:subgrid}
+.home-list>.empty{grid-row:span 2;align-self:start}
+.home-list .publication,.home-list .post-card{margin:0;padding:23px 0 26px;min-width:0}
+.home-list .post-card{display:flex;flex-direction:column}
+.home-list .publication>div{display:flex;flex-direction:column;min-width:0}
+.home-list h3{font-size:21px;line-height:1.65;margin:12px 0 9px}
+.home-list .read-link{margin-top:auto;padding-top:15px;min-height:34px}
+.home-list .pub-actions{margin-top:auto;padding-top:15px}
+.section-footer{padding-top:22px;border-top:1px solid var(--line)}
+.view-all{display:inline-flex;align-items:center;justify-content:space-between;gap:37px;border:1px solid #becbbd;border-radius:3px;padding:8px 15px;font-size:13px;color:var(--green);transition:background .15s}
+.view-all:hover{background:#e8ede2}
+
+/* A quiet, consistent reading scale for the about page. */
+.about-page{max-width:800px;margin:0 auto;padding:46px 0 64px}
+.about-heading{margin-bottom:28px}
+.about-heading h1{font:500 32px/1.45 var(--serif);letter-spacing:2px;margin:8px 0 0}
+.about-person{display:flex;align-items:center;gap:22px;margin-bottom:25px}
+.about-person .avatar{width:88px;height:88px;margin:0;flex-shrink:0}
+.about-name{font-size:19px;line-height:1.6;font-weight:500;margin:0 0 4px}
+.about-name span{font:14px/1.6 Georgia,serif;color:var(--muted);margin-left:14px;display:inline-block}
+.about-location{font-size:14px;line-height:1.8;color:var(--muted);margin:0}
+.about-prose{font-size:16px;line-height:1.95}
+.about-prose p{margin:0 0 18px}
+.about-prose>:last-child{margin-bottom:0}
+.about-prose h1,.about-prose h2,.about-prose h3,.about-prose h4{font:500 19px/1.6 var(--sans);margin:28px 0 12px;letter-spacing:0}
+.about-section{padding-top:28px;margin-top:30px;border-top:1px solid var(--line)}
+.about-section>h2{font:500 19px/1.6 var(--sans);margin:0 0 18px}
+.about-section .tags{gap:10px}
+.about-section .tags span{font-size:14px;line-height:1.8;padding:5px 12px}
+.about-experience{display:grid;gap:22px}
+.experience-row{display:grid;grid-template-columns:130px minmax(0,1fr);gap:24px}
+.experience-period{font-size:14px;line-height:1.8;color:var(--muted);padding-top:2px}
+.experience-row h3{font:500 16px/1.8 var(--sans);margin:0 0 3px}
+.experience-row p{font-size:14px;line-height:1.8;color:#616a62;margin:0}
+.about-contact>div{display:flex;flex-wrap:wrap;gap:16px;font-size:14px;color:var(--green)}
+.blog-categories{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 30px;padding:0 0 22px;border-bottom:1px solid var(--line)}
+.category-link{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:3px;padding:7px 15px;font-size:13px;line-height:1.7;color:#616a62}
+.category-link span{font-size:11px;opacity:.75}
+.category-link:hover{border-color:var(--green);background:#e8ede2}
+.category-link[aria-current]{background:var(--green);border-color:var(--green);color:#fff}
+.article .prose img{border-radius:3px;margin:30px auto;max-width:100%;height:auto}
+@media(max-width:900px){.home-sections{column-gap:32px}}
+@media(max-width:640px){
+  .home-sections{grid-template-columns:minmax(0,1fr);grid-template-rows:none;row-gap:36px}
+  .home-section{display:block;grid-row:auto}
+  .home-list{display:block}
+  .home-list h3{font-size:20px}
+  .section-footer{padding-top:18px}
+  .about-page{padding:32px 0 45px}
+  .about-heading{margin-bottom:24px}
+  .about-heading h1{font-size:28px}
+  .about-person{gap:16px;margin-bottom:23px}
+  .about-person .avatar{width:72px;height:72px}
+  .about-name span{display:block;margin:3px 0 0}
+  .about-prose{font-size:15px;line-height:1.95}
+  .about-section{margin-top:27px;padding-top:25px}
+  .about-section>h2{font-size:18px}
+  .experience-row{grid-template-columns:1fr;gap:5px}
+  .blog-categories{gap:8px;margin-bottom:18px}
+  .category-link{padding:7px 12px}
+}
