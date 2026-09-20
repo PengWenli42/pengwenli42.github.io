@@ -14,10 +14,10 @@ export function safeUrl(value = '') {
 export function markdown(text = '') {
   return sanitizeHtml(marked.parse(String(text)), {
     allowedTags: [...sanitizeHtml.defaults.allowedTags, 'img'],
-    allowedAttributes: { ...sanitizeHtml.defaults.allowedAttributes, img: ['src', 'alt', 'title', 'width', 'height'] },
+    allowedAttributes: { ...sanitizeHtml.defaults.allowedAttributes, img: ['src', 'alt', 'title', 'width', 'height', 'loading', 'decoding'] },
     allowedSchemes: ['http', 'https', 'mailto'],
     allowProtocolRelative: false,
-    transformTags: { img: (tagName, attribs) => ({ tagName, attribs: {...attribs, loading: 'lazy'} }) }
+    transformTags: { img: (tagName, attribs) => ({ tagName, attribs: {...attribs, loading: 'lazy', decoding: 'async'} }) }
   });
 }
 export function dateText(value) {
@@ -34,13 +34,21 @@ export async function buildSite(root = process.cwd(), output = path.join(root, '
   const profile = JSON.parse(await readFile(path.join(root, 'content/profile.json'), 'utf8'));
   if (!profile.name?.trim()) throw new Error('个人介绍必须填写姓名');
   const files = async (dir, ext) => (await readdir(path.join(root, dir))).filter(f => f.endsWith(ext));
+  const categories = [
+    {label: '随笔', slug: 'essay'},
+    {label: '书评', slug: 'book-review'},
+    {label: '田野笔记', slug: 'field-notes'},
+    {label: '影评', slug: 'film-review'},
+    {label: '乐评', slug: 'music-review'}
+  ];
+  const categoryLabel = value => String(value || '随笔').trim() === '田野日记' ? '田野笔记' : String(value || '随笔').trim();
   const posts = [];
   for (const file of await files('content/posts', '.md')) {
     const {data, content} = matter(await readFile(path.join(root, 'content/posts', file), 'utf8'));
     if (data.published !== true) continue;
     if (!data.title?.trim()) throw new Error(`文章缺少标题：${file}`);
     const slug = path.basename(file, '.md');
-    posts.push({...data, content, date: dateText(data.date), slug, href: `/blog/${encodeURIComponent(slug)}/`});
+    posts.push({...data, category: categoryLabel(data.category), content, date: dateText(data.date), slug, href: `/blog/${encodeURIComponent(slug)}/`});
   }
   posts.sort((a,b) => b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug));
   const publications = [];
@@ -66,12 +74,21 @@ export async function buildSite(root = process.cwd(), output = path.join(root, '
     const doi = p.doi ? (/^https?:\/\//i.test(p.doi) ? safeUrl(p.doi) : `https://doi.org/${encodeURI(p.doi)}`) : '';
     return `<article class="publication"><span class="pub-number">${String(i+1).padStart(2,'0')}</span><div><div class="post-meta"><span>${escape(p.venue || '成果')}</span><span>${escape(p.year)}</span></div><h3>${escape(p.title)}</h3><p class="authors">${escape(p.authors)}</p>${p.description?`<p>${escape(p.description)}</p>`:''}<div class="pub-actions">${external(p.url, '查看成果')}${external(doi,'DOI')}${external(p.pdf,'PDF')}<button type="button" data-copy="${escape(citation)}">复制引用</button>${p.bibtex?`<a href="/citations/${encodeURIComponent(p.slug)}.bib" download>BibTeX ↓</a>`:''}</div></div></article>`;
   };
-  const intro = `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="green-dot"></span> ${escape(profile.tagline)}</div><h1>${escape(profile.name)}<span>${escape(profile.englishName)}</span></h1><p class="intro">${escape(profile.intro)}</p><div class="hero-links"><a class="primary-link" href="/about/">认识我 <span aria-hidden="true">↗</span></a><a href="/blog/">读我的文字 <span aria-hidden="true">→</span></a></div></div><aside class="profile-note">${safeUrl(profile.avatar)?`<img class="avatar" src="${escape(safeUrl(profile.avatar))}" alt="${escape(profile.name)}的头像" width="140" height="140">`:`<div class="monogram" aria-hidden="true">文<span>丽</span></div>`}<span class="note-rule"></span><p>${escape(profile.location || '研究、记录，与生活。')}</p><div class="social-links">${external(profile.github,'GitHub')}${external(profile.scholar,'学术主页')}${profile.email?`<a href="mailto:${escape(profile.email)}">联系我 ↗</a>`:''}</div></aside></section>`;
-  await write('index.html', layout('首页','/',`${intro}<div class="home-sections"><section><div class="section-heading"><div><span class="eyebrow">PUBLICATIONS</span><h2>成果与引用<span class="section-count">${String(publications.length).padStart(2,'0')}</span></h2></div><a href="/publications/">全部成果 ↗</a></div>${publications.length?publications.slice(0,2).map(pubCard).join(''):empty('成果整理中','论文、作品与相关引用，将在这里陆续收录。')}</section><section><div class="section-heading"><div><span class="eyebrow">JOURNAL</span><h2>最近的文字<span class="section-count">${String(posts.length).padStart(2,'0')}</span></h2></div><a href="/blog/">全部文章 ↗</a></div>${posts.length?posts.slice(0,2).map(postCard).join(''):empty('等待第一篇文字','一些观察，一些思考，慢慢写下来。')}</section></div>`));
-  await write('about/index.html',layout('关于我','/about/',`<section class="page-heading"><span class="eyebrow">ABOUT</span><h1>关于我<span class="title-dot">.</span></h1><p>${escape(profile.intro)}</p></section><div class="about-layout"><article class="prose">${markdown(profile.about)}${profile.interests?.length?`<h2>研究方向与兴趣</h2><div class="tags">${profile.interests.map(x=>`<span>${escape(x)}</span>`).join('')}</div>`:''}${profile.experience?.length?`<h2>教育与工作经历</h2><div class="timeline">${profile.experience.map(x=>`<div><span>${escape(x.period)}</span><h3>${escape(x.title)}</h3><p>${escape(x.organization)}</p></div>`).join('')}</div>`:''}</article><aside class="about-aside"><span class="eyebrow">ELSEWHERE</span><h2>找到我</h2>${external(profile.github,'GitHub')}${external(profile.scholar,'学术主页')}${profile.email?`<a href="mailto:${escape(profile.email)}">${escape(profile.email)} ↗</a>`:''}${profile.location?`<p>${escape(profile.location)}</p>`:''}</aside></div>`));
+  const contactLinks = `${external(profile.scholar,'学术主页')}${profile.email?`<a href="mailto:${escape(profile.email)}">联系我 ↗</a>`:''}`;
+  const intro = `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="green-dot"></span> ${escape(profile.tagline)}</div><h1>${escape(profile.name)}<span>${escape(profile.englishName)}</span></h1><p class="intro">${escape(profile.intro)}</p><div class="hero-links"><a class="primary-link" href="/about/">认识我 <span aria-hidden="true">↗</span></a><a href="/blog/">读我的文字 <span aria-hidden="true">→</span></a></div></div><aside class="profile-note">${safeUrl(profile.avatar)?`<img class="avatar" src="${escape(safeUrl(profile.avatar))}" alt="${escape(profile.name)}的头像" width="140" height="140">`:`<div class="monogram" aria-hidden="true">文<span>丽</span></div>`}<span class="note-rule"></span><p>${escape(profile.location || '研究、记录，与生活。')}</p>${contactLinks?`<div class="social-links">${contactLinks}</div>`:''}</aside></section>`;
+  const homeSection = (eyebrow, title, total, href, items, placeholder) => `<section class="home-section"><div class="section-heading"><div><span class="eyebrow">${eyebrow}</span><h2>${title}<span class="section-count">${String(total).padStart(2,'0')}</span></h2></div></div><div class="home-list">${items || placeholder}</div><div class="section-footer"><a class="view-all" href="${href}" aria-label="查看全部${title === '最近的文字' ? '文章' : '成果'}">查看全部 <span aria-hidden="true">→</span></a></div></section>`;
+  await write('index.html', layout('首页','/',`${intro}<div class="home-sections">${homeSection('PUBLICATIONS','成果与引用',publications.length,'/publications/',publications.slice(0,2).map(pubCard).join(''),empty('成果整理中','论文、作品与相关引用，将在这里陆续收录。'))}${homeSection('JOURNAL','最近的文字',posts.length,'/blog/',posts.slice(0,2).map(postCard).join(''),empty('等待第一篇文字','一些观察，一些思考，慢慢写下来。'))}</div>`));
+  const interests = (profile.interests || []).flatMap(value => String(value).split(/[，,、]/)).map(value => value.trim()).filter(Boolean);
+  await write('about/index.html',layout('关于我','/about/',`<div class="about-page"><header class="about-heading"><span class="eyebrow">ABOUT</span><h1>关于我</h1></header><div class="about-introduction"><div class="about-person">${safeUrl(profile.avatar)?`<img class="avatar" src="${escape(safeUrl(profile.avatar))}" alt="${escape(profile.name)}的头像" width="88" height="88">`:''}<div><p class="about-name">${escape(profile.name)}<span>${escape(profile.englishName)}</span></p>${profile.location?`<p class="about-location">${escape(profile.location)}</p>`:''}</div></div><div class="prose about-prose">${markdown(profile.about)}</div></div>${interests.length?`<section class="about-section"><h2>研究方向与兴趣</h2><div class="tags">${interests.map(x=>`<span>${escape(x)}</span>`).join('')}</div></section>`:''}${profile.experience?.length?`<section class="about-section"><h2>教育与工作经历</h2><div class="about-experience">${profile.experience.map(x=>`<div class="experience-row"><span class="experience-period">${escape(x.period)}</span><div><h3>${escape(x.title)}</h3><p>${escape(x.organization)}</p></div></div>`).join('')}</div></section>`:''}${contactLinks?`<section class="about-section about-contact"><h2>联系与学术主页</h2><div>${contactLinks}</div></section>`:''}</div>`));
   await write('publications/index.html',layout('成果与引用','/publications/',`<section class="page-heading"><span class="eyebrow">PUBLICATIONS & WORK</span><h1>成果与引用<span class="title-dot">.</span></h1><p>论文、作品，以及可供引用的记录。</p></section><section class="pub-list">${publications.length?publications.map(pubCard).join(''):empty('成果整理中','新的成果将陆续更新。')}</section>`));
   for (const p of publications) if (p.bibtex) await write(`citations/${p.slug}.bib`,p.bibtex);
-  await write('blog/index.html',layout('博客与随笔','/blog/',`<section class="page-heading"><span class="eyebrow">JOURNAL</span><h1>博客与随笔<span class="title-dot">.</span></h1><p>把想法留在纸上，也留在这里。</p></section><section class="blog-grid">${posts.length?posts.map(postCard).join(''):empty('还没有公开的文章','第一篇文字，正在路上。')}</section>`));
+  const blogPage = selected => {
+    const selectedPosts = selected ? posts.filter(p => p.category === selected.label) : posts;
+    const filter = (href, label, count, current) => `<a class="category-link" href="${href}"${current?' aria-current="page"':''}>${escape(label)}<span>${count}</span></a>`;
+    return layout(selected ? `${selected.label} · 博客与随笔` : '博客与随笔','/blog/',`<section class="page-heading"><span class="eyebrow">JOURNAL</span><h1>博客与随笔<span class="title-dot">.</span></h1><p>把想法留在纸上，也留在这里。</p></section><nav class="blog-categories" aria-label="文章分类">${filter('/blog/','全部',posts.length,!selected)}${categories.map(category => filter(`/blog/category/${category.slug}/`,category.label,posts.filter(p => p.category === category.label).length,selected?.slug === category.slug)).join('')}</nav><section class="blog-grid" aria-label="${selected ? escape(selected.label) : '全部'}文章">${selectedPosts.length?selectedPosts.map(postCard).join(''):empty('还没有'+(selected ? escape(selected.label) : '公开的文章'),'新的文字，正在路上。')}</section>`);
+  };
+  await write('blog/index.html',blogPage());
+  for (const category of categories) await write(`blog/category/${category.slug}/index.html`,blogPage(category));
   for (const p of posts) {
     await write(`blog/${p.slug}/index.html`,layout(p.title,'/blog/',`<article class="article"><a class="back" href="/blog/">← 所有文章</a><header class="article-heading"><div class="post-meta"><span>${escape(p.category||'随笔')}</span><time datetime="${p.date}">${p.date.replaceAll('-','.')}</time></div><h1>${escape(p.title)}</h1>${p.summary?`<p>${escape(p.summary)}</p>`:''}<span class="byline">文 / ${escape(profile.name)}</span></header>${safeUrl(p.cover)?`<img class="article-cover" src="${escape(safeUrl(p.cover))}" alt="${escape(p.title)}的封面">`:''}<div class="prose">${markdown(p.content)}</div><a class="back article-bottom" href="/blog/">← 返回博客与随笔</a></article>`, p.summary || p.title));
   }
