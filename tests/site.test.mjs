@@ -1,21 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, writeFile, readFile, cp, access} from 'node:fs/promises';
+import {mkdtemp, mkdir, writeFile, readFile, cp, access, rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {buildSite, markdown, safeUrl} from '../scripts/build.mjs';
 
-test('网页内容过滤脚本，允许正文图片和正常链接',()=>{
-  const html=markdown('# 文章\n\n![图](/uploads/photo.png)\n\n<script>alert(1)</script>\n\n<a href="javascript:alert(1)">unsafe</a>');
+test('正文多张图片保留地址和延迟加载，脚本与危险图片属性被过滤',()=>{
+  const html=markdown('# 文章\n\n![图一](/uploads/photo.png)\n\n段落之间可以插图。\n\n![图二](https://example.com/photo.jpg)\n\n<img src="/uploads/third.webp" alt="图三" onerror="unsafeImage()">\n\n<script>unsafeScript()</script>\n\n<a href="javascript:alert(1)">unsafe</a>\n\n[正常链接](https://example.com/article)');
   assert.match(html, /<h1>文章<\/h1>/);
-  assert.match(html, /src="\/uploads\/photo.png"/);
-  assert.doesNotMatch(html, /<script|javascript:/);
+  const images=[...html.matchAll(/<img\b[^>]*>/g)].map(match=>match[0]);
+  assert.equal(images.length,3);
+  assert.deepEqual(images.map(image=>image.match(/\bsrc="([^"]+)"/)[1]),[
+    '/uploads/photo.png','https://example.com/photo.jpg','/uploads/third.webp'
+  ]);
+  for (const image of images) {
+    assert.match(image,/\bloading="lazy"/);
+    assert.match(image,/\bdecoding="async"/);
+    assert.match(image,/\balt="图[一二三]"/);
+  }
+  assert.match(html,/href="https:\/\/example.com\/article"/);
+  assert.doesNotMatch(html, /<script|javascript:|onerror|unsafeScript|unsafeImage/);
   for (const bad of ['javascript:alert(1)','//evil.test','/\\evil.test','data:text/html,test']) assert.equal(safeUrl(bad),'');
   assert.equal(safeUrl('https://example.com/a'),'https://example.com/a');
 });
 
-test('后台内容生成真实文章、引用和附件；未发布原稿不进入网站；删除内容后不留旧页面',async()=>{
+test('后台内容生成真实文章、引用和附件；未发布原稿不进入网站；删除内容后不留旧页面',async(t)=>{
   const root=await mkdtemp(path.join(os.tmpdir(),'personal-homepage-test-'));
+  t.after(()=>rm(root,{recursive:true,force:true}));
   for (const folder of ['content/posts','content/publications','public/uploads']) await mkdir(path.join(root,folder),{recursive:true});
   await cp('public',path.join(root,'public'),{recursive:true});
   await writeFile(path.join(root,'content/profile.json'),JSON.stringify({name:'测试作者',englishName:'Test',intro:'测试简介',about:'## 介绍\n\n可在后台编辑。',interests:['阅读'],experience:[{period:'2024',title:'研究',organization:'测试机构'}]}));
@@ -39,4 +50,107 @@ test('后台内容生成真实文章、引用和附件；未发布原稿不进�
   await writeFile(post,'---\ntitle: 一篇测试文章\npublished: false\n---\n已撤下');
   await buildSite(root);
   await assert.rejects(access(path.join(root,'dist/blog/中文文章/index.html')));
+});
+
+async function createFixture(t, profile={}) {
+  const root=await mkdtemp(path.join(os.tmpdir(),'personal-homepage-regression-'));
+  t.after(()=>rm(root,{recursive:true,force:true}));
+  for (const folder of ['content/posts','content/publications','public/uploads']) {
+    await mkdir(path.join(root,folder),{recursive:true});
+  }
+  await writeFile(path.join(root,'content/profile.json'),JSON.stringify({
+    name:'测试作者',englishName:'Test',intro:'测试简介',about:'一段介绍。',...profile
+  }));
+  return root;
+}
+
+async function writePost(root, slug, data={}, body='文章正文。') {
+  const fields={title:`文章-${slug}`,date:'2026-09-20',published:true,...data};
+  const frontmatter=Object.entries(fields).map(([key,value])=>`${key}: ${JSON.stringify(value)}`).join('\n');
+  await writeFile(path.join(root,'content/posts',`${slug}.md`),`---\n${frontmatter}\n---\n${body}`);
+}
+
+const readPage=(root, page)=>readFile(path.join(root,'dist',page),'utf8');
+const articleLinks=html=>[...html.matchAll(/<a\b[^>]*\bhref="(\/blog\/(?!category\/)[^/]+\/)"/g)]
+  .map(match=>match[1]).sort();
+
+test('五个分类页只列出对应文章，并将旧的田野日记归入田野笔记',async(t)=>{
+  const root=await createFixture(t);
+  const fixtures=[
+    {slug:'essay-one',category:'随笔',route:'essay'},
+    {slug:'book-one',category:'书评',route:'book-review'},
+    {slug:'field-one',category:'田野笔记',route:'field-notes'},
+    {slug:'legacy-field',category:'田野日记',route:'field-notes'},
+    {slug:'film-one',category:'影评',route:'film-review'},
+    {slug:'music-one',category:'乐评',route:'music-review'}
+  ];
+  for (const fixture of fixtures) await writePost(root,fixture.slug,{category:fixture.category});
+  await writePost(root,'draft',{category:'田野笔记',published:false});
+  await buildSite(root);
+
+  for (const route of new Set(fixtures.map(fixture=>fixture.route))) {
+    const html=await readPage(root,`blog/category/${route}/index.html`);
+    const expected=fixtures.filter(fixture=>fixture.route===route).map(fixture=>`/blog/${fixture.slug}/`).sort();
+    assert.deepEqual(articleLinks(html),expected,`分类 ${route} 不应混入其他分类或未发布文章`);
+    assert.match(html,new RegExp(`href="/blog/category/${route}/"[^>]*aria-current="page"`));
+  }
+  const all=await readPage(root,'blog/index.html');
+  assert.deepEqual(articleLinks(all),fixtures.map(fixture=>`/blog/${fixture.slug}/`).sort());
+  const legacyArticle=await readPage(root,'blog/legacy-field/index.html');
+  assert.match(legacyArticle,/田野笔记/);
+  assert.doesNotMatch(legacyArticle,/田野日记/);
+});
+
+test('没有文章的分类仍生成可访问页面，说明为空并保留返回全部的入口',async(t)=>{
+  const root=await createFixture(t);
+  await writePost(root,'only-essay',{category:'随笔'});
+  await buildSite(root);
+  const html=await readPage(root,'blog/category/field-notes/index.html');
+  assert.deepEqual(articleLinks(html),[]);
+  assert.match(html,/还没有田野笔记/);
+  assert.match(html,/<a\b[^>]*href="\/blog\/"[^>]*>全部/);
+  assert.match(html,/href="\/blog\/category\/field-notes\/"[^>]*aria-current="page"/);
+});
+
+test('首页每栏仅显示最新两条，查看全部入口在预览之后并链接完整列表',async(t)=>{
+  const root=await createFixture(t);
+  for (let index=1;index<=3;index++) {
+    await writePost(root,`post-${index}`,{category:'随笔',date:`2026-09-${20-index}`});
+    await writeFile(path.join(root,'content/publications',`pub-${index}.json`),JSON.stringify({
+      title:`成果-${index}`,authors:'作者',year:2027-index,published:true
+    }));
+  }
+  await buildSite(root);
+  const html=await readPage(root,'index.html');
+  assert.deepEqual(articleLinks(html),['/blog/post-1/','/blog/post-2/']);
+  assert.match(html,/成果-1/);
+  assert.match(html,/成果-2/);
+  assert.doesNotMatch(html,/成果-3|文章-post-3/);
+  assert.ok(html.indexOf('成果-1')<html.indexOf('成果-2'));
+  assert.ok(html.indexOf('文章-post-1')<html.indexOf('文章-post-2'));
+
+  const viewAll=[...html.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>\s*查看全部[\s\S]*?<\/a>/g)];
+  assert.deepEqual(viewAll.map(match=>match[1]),['/publications/','/blog/']);
+  assert.ok(viewAll[0].index>html.indexOf('成果-2'),'全部成果入口应在成果预览之后');
+  assert.ok(viewAll[1].index>html.indexOf('文章-post-2'),'全部文章入口应在文章预览之后');
+  assert.match(await readPage(root,'publications/index.html'),/成果-3/);
+  assert.deepEqual(articleLinks(await readPage(root,'blog/index.html')),[
+    '/blog/post-1/','/blog/post-2/','/blog/post-3/'
+  ]);
+});
+
+test('资料保留 GitHub 值时，首页和关于我仍不显示该链接，其他联系入口保留',async(t)=>{
+  const github='https://github.com/fixture-person';
+  const root=await createFixture(t,{
+    github,scholar:'https://scholar.example.com/author',email:'author@example.com'
+  });
+  await buildSite(root);
+  for (const page of ['index.html','about/index.html']) {
+    const html=await readPage(root,page);
+    assert.ok(!html.includes(github),`${page} 不应显示个人 GitHub 链接`);
+    assert.match(html,/href="https:\/\/scholar.example.com\/author"/);
+    assert.match(html,/href="mailto:author@example.com"/);
+  }
+  const profile=JSON.parse(await readFile(path.join(root,'content/profile.json'),'utf8'));
+  assert.equal(profile.github,github);
 });
