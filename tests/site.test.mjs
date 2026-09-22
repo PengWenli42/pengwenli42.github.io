@@ -74,15 +74,16 @@ const readPage=(root, page)=>readFile(path.join(root,'dist',page),'utf8');
 const articleLinks=html=>[...html.matchAll(/<a\b[^>]*\bhref="(\/blog\/(?!category\/)[^/]+\/)"/g)]
   .map(match=>match[1]).sort();
 
-test('五个分类页只列出对应文章，并将旧的田野日记归入田野笔记',async(t)=>{
+test('仅保留三个分类页，旧田野和评论分类归入随笔，各分类只列出对应文章',async(t)=>{
   const root=await createFixture(t);
   const fixtures=[
     {slug:'essay-one',category:'随笔',route:'essay'},
     {slug:'book-one',category:'书评',route:'book-review'},
-    {slug:'field-one',category:'田野笔记',route:'field-notes'},
-    {slug:'legacy-field',category:'田野日记',route:'field-notes'},
-    {slug:'film-one',category:'影评',route:'film-review'},
-    {slug:'music-one',category:'乐评',route:'music-review'}
+    {slug:'story-one',category:'小故事',route:'story'},
+    {slug:'field-one',category:'田野笔记',route:'essay'},
+    {slug:'legacy-field',category:'田野日记',route:'essay'},
+    {slug:'film-one',category:'影评',route:'essay'},
+    {slug:'music-one',category:'乐评',route:'essay'}
   ];
   for (const fixture of fixtures) await writePost(root,fixture.slug,{category:fixture.category});
   await writePost(root,'draft',{category:'田野笔记',published:false});
@@ -93,23 +94,35 @@ test('五个分类页只列出对应文章，并将旧的田野日记归入田�
     const expected=fixtures.filter(fixture=>fixture.route===route).map(fixture=>`/blog/${fixture.slug}/`).sort();
     assert.deepEqual(articleLinks(html),expected,`分类 ${route} 不应混入其他分类或未发布文章`);
     assert.match(html,new RegExp(`href="/blog/category/${route}/"[^>]*aria-current="page"`));
+    assert.doesNotMatch(html,/href="\/blog\/category\/(?:field-notes|film-review|music-review)\//);
   }
   const all=await readPage(root,'blog/index.html');
   assert.deepEqual(articleLinks(all),fixtures.map(fixture=>`/blog/${fixture.slug}/`).sort());
-  const legacyArticle=await readPage(root,'blog/legacy-field/index.html');
-  assert.match(legacyArticle,/田野笔记/);
-  assert.doesNotMatch(legacyArticle,/田野日记/);
+  assert.deepEqual([...all.matchAll(/href="(\/blog\/category\/[^/]+\/)"/g)].map(match=>match[1]),[
+    '/blog/category/essay/','/blog/category/book-review/','/blog/category/story/'
+  ]);
+  for (const slug of ['field-one','legacy-field','film-one','music-one']) {
+    const article=await readPage(root,`blog/${slug}/index.html`);
+    assert.match(article,/<span>随笔<\/span>/);
+    assert.doesNotMatch(article,/田野笔记|田野日记|影评|乐评/);
+  }
+  for (const route of ['field-notes','film-review','music-review']) {
+    await assert.rejects(access(path.join(root,`dist/blog/category/${route}/index.html`)));
+  }
 });
 
-test('没有文章的分类仍生成可访问页面，说明为空并保留返回全部的入口',async(t)=>{
+test('小故事没有文章时仍可访问，显示数量零并保留返回全部的入口',async(t)=>{
   const root=await createFixture(t);
   await writePost(root,'only-essay',{category:'随笔'});
   await buildSite(root);
-  const html=await readPage(root,'blog/category/field-notes/index.html');
+  const html=await readPage(root,'blog/category/story/index.html');
   assert.deepEqual(articleLinks(html),[]);
-  assert.match(html,/还没有田野笔记/);
+  assert.match(html,/还没有小故事/);
   assert.match(html,/<a\b[^>]*href="\/blog\/"[^>]*>全部/);
-  assert.match(html,/href="\/blog\/category\/field-notes\/"[^>]*aria-current="page"/);
+  assert.match(html,/href="\/blog\/category\/story\/"[^>]*aria-current="page"[^>]*>小故事<span>0<\/span>/);
+  const all=await readPage(root,'blog/index.html');
+  assert.match(all,/href="\/blog\/category\/story\/"[^>]*>小故事<span>0<\/span>/);
+  assert.doesNotMatch(all,/href="\/blog\/category\/(?:field-notes|film-review|music-review)\//);
 });
 
 test('首页每栏仅显示最新两条，查看全部入口在预览之后并链接完整列表',async(t)=>{
