@@ -37,11 +37,14 @@ export async function buildSite(root = process.cwd(), output = path.join(root, '
   const categories = [
     {label: '随笔', slug: 'essay'},
     {label: '书评', slug: 'book-review'},
-    {label: '田野笔记', slug: 'field-notes'},
-    {label: '影评', slug: 'film-review'},
-    {label: '乐评', slug: 'music-review'}
+    {label: '小故事', slug: 'story'}
   ];
-  const categoryLabel = value => String(value || '随笔').trim() === '田野日记' ? '田野笔记' : String(value || '随笔').trim();
+  const categoryLabel = value => {
+    const label = String(value || '').trim() || '随笔';
+    if (['田野日记', '田野笔记', '影评', '乐评'].includes(label)) return '随笔';
+    if (categories.some(category => category.label === label)) return label;
+    throw new Error(`不支持的文章分类：${label}，请选择随笔、书评或小故事`);
+  };
   const posts = [];
   for (const file of await files('content/posts', '.md')) {
     const {data, content} = matter(await readFile(path.join(root, 'content/posts', file), 'utf8'));
