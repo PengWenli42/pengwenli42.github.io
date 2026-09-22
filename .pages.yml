@@ -54,7 +54,7 @@ content:
         default: 随笔
         description: 选择文章所属分类，访客可在「博客与随笔」页按分类阅读。
         options:
-          values: [随笔, 书评, 田野笔记, 影评, 乐评]
+          values: [随笔, 书评, 小故事]
       - { name: summary, label: 摘要, type: text }
       - { name: cover, label: 封面图（可留空）, type: image }
       - name: published
