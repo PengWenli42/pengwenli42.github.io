@@ -1,7 +1,7 @@
 ---
 title: 飞鼠溪（Flying Squirrel Creek）
 date: 2023-04-23
-category: 乐评
+category: 随笔
 cover: /uploads/file-4.jpg
 published: true
 ---
